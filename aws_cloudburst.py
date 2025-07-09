@@ -44,6 +44,11 @@ PADDLE_WIDTH = 120
 PADDLE_HEIGHT = 20
 POWERUP_FALL_SPEED = 150
 
+# Power-up Configuration
+SHIELD_HEIGHT = 10
+LASER_COOLDOWN = 0.5
+POWERUP_DROP_CHANCE = 0.25  # Increased from 0.15 to 25%
+
 # Block Configuration
 BLOCK_WIDTH = 80
 BLOCK_HEIGHT = 30
@@ -122,15 +127,18 @@ class Ball:
         self.speed = speed
         self.trail_positions = []
         
-    def update(self, dt: float) -> None:
+    def update(self, dt: float, slow_motion: bool = False) -> None:
         """Update ball position and handle wall collisions."""
+        # Apply slow motion effect
+        effective_dt = dt * 0.7 if slow_motion else dt
+        
         # Store trail positions for visual effect
         self.trail_positions.append((self.position.x, self.position.y))
         if len(self.trail_positions) > 5:
             self.trail_positions.pop(0)
             
         # Update position
-        self.position = self.position + self.velocity * dt
+        self.position = self.position + self.velocity * effective_dt
         
         # Wall collisions
         if self.position.x <= self.radius or self.position.x >= SCREEN_WIDTH - self.radius:
@@ -152,6 +160,15 @@ class Ball:
         speed = self.velocity.magnitude()
         
         self.velocity = Vector2D(math.sin(angle) * speed, -abs(math.cos(angle)) * speed)
+    
+    def get_rect(self) -> pygame.Rect:
+        """Get ball collision rectangle."""
+        return pygame.Rect(
+            self.position.x - self.radius,
+            self.position.y - self.radius,
+            self.radius * 2,
+            self.radius * 2
+        )
     
     def draw(self, screen: pygame.Surface) -> None:
         """Draw the AWS Q Developer ball with enhanced logo design."""
@@ -560,6 +577,91 @@ class PowerUp:
         text = font.render(self.powerup_type.value[0][:8], True, AWS_WHITE)
         text_rect = text.get_rect(center=rect.center)
         screen.blit(text, text_rect)
+
+class Laser:
+    """Laser projectile fired from paddle."""
+    
+    def __init__(self, x: float, y: float):
+        self.position = Vector2D(x, y)
+        self.velocity = Vector2D(0, -400)  # Move upward
+        self.width = 4
+        self.height = 15
+        self.active = True
+        
+    def update(self, dt: float) -> None:
+        """Update laser position."""
+        self.position = self.position + self.velocity * dt
+        
+        # Remove if off screen
+        if self.position.y < 0:
+            self.active = False
+    
+    def get_rect(self) -> pygame.Rect:
+        """Get laser collision rectangle."""
+        return pygame.Rect(
+            self.position.x - self.width / 2,
+            self.position.y - self.height / 2,
+            self.width,
+            self.height
+        )
+    
+    def draw(self, screen: pygame.Surface) -> None:
+        """Draw the laser."""
+        if not self.active:
+            return
+            
+        rect = self.get_rect()
+        pygame.draw.rect(screen, AWS_RED, rect)
+        pygame.draw.rect(screen, AWS_WHITE, rect, 1)
+
+class Shield:
+    """Protective barrier above paddle."""
+    
+    def __init__(self, paddle_x: float, paddle_y: float, paddle_width: float):
+        self.position = Vector2D(paddle_x, paddle_y - 30)
+        self.width = paddle_width
+        self.height = SHIELD_HEIGHT
+        self.active = True
+        self.hits_remaining = 3  # Shield can take 3 hits
+        
+    def update(self, paddle_x: float) -> None:
+        """Update shield position to follow paddle."""
+        self.position.x = paddle_x
+    
+    def get_rect(self) -> pygame.Rect:
+        """Get shield collision rectangle."""
+        return pygame.Rect(
+            self.position.x - self.width / 2,
+            self.position.y - self.height / 2,
+            self.width,
+            self.height
+        )
+    
+    def hit(self) -> bool:
+        """Handle shield being hit. Returns True if shield is destroyed."""
+        self.hits_remaining -= 1
+        if self.hits_remaining <= 0:
+            self.active = False
+            return True
+        return False
+    
+    def draw(self, screen: pygame.Surface) -> None:
+        """Draw the shield."""
+        if not self.active:
+            return
+            
+        rect = self.get_rect()
+        
+        # Color based on remaining hits
+        if self.hits_remaining == 3:
+            color = AWS_LIGHT_GRAY
+        elif self.hits_remaining == 2:
+            color = (200, 200, 200)
+        else:
+            color = (150, 150, 150)
+            
+        pygame.draw.rect(screen, color, rect)
+        pygame.draw.rect(screen, AWS_WHITE, rect, 2)
 
 class Level:
     """Level data and block arrangements representing AWS architectures."""
@@ -1045,12 +1147,16 @@ class Game:
         self.balls: List[Ball] = []
         self.level = Level(1)
         self.powerups: List[PowerUp] = []
+        self.lasers: List[Laser] = []
+        self.shield: Optional[Shield] = None
         
         # Power-up tracking
         self.active_powerups: Dict[PowerUpType, float] = {
             powerup_type: 0 for powerup_type in PowerUpType
         }
         self.score_multiplier = 1
+        self.laser_cooldown = 0.0
+        self.slow_motion_active = False
         
         # UI and audio
         self.ui = UI()
@@ -1163,12 +1269,20 @@ class Game:
         """Update game logic."""
         keys_pressed = pygame.key.get_pressed()
         
+        # Handle laser firing
+        if keys_pressed[pygame.K_SPACE] and self.active_powerups[PowerUpType.LASER_PADDLE] > 0:
+            if self.laser_cooldown <= 0:
+                paddle_rect = self.paddle.get_rect()
+                laser = Laser(paddle_rect.centerx, paddle_rect.top)
+                self.lasers.append(laser)
+                self.laser_cooldown = LASER_COOLDOWN
+        
         # Update paddle
         self.paddle.update(dt, keys_pressed)
         
         # Update balls
         for ball in self.balls[:]:
-            ball.update(dt)
+            ball.update(dt, self.slow_motion_active)
             
             # Check if ball fell off screen
             if ball.position.y > SCREEN_HEIGHT:
@@ -1180,8 +1294,10 @@ class Game:
                     else:
                         self._spawn_ball()
         
-        # Ball-paddle collision
+        # Get paddle rect for collision checks
         paddle_rect = self.paddle.get_rect()
+        
+        # Ball-paddle collision
         for ball in self.balls:
             ball_rect = pygame.Rect(ball.position.x - ball.radius, ball.position.y - ball.radius,
                                   ball.radius * 2, ball.radius * 2)
@@ -1213,7 +1329,7 @@ class Game:
                         self.audio.play_block_hit()
                         
                         # Chance to spawn power-up
-                        if destroyed and block.block_type.value[1] >= 2 and random.random() < 0.15:
+                        if destroyed and block.block_type.value[1] >= 2 and random.random() < POWERUP_DROP_CHANCE:
                             powerup_type = random.choice(list(PowerUpType))
                             powerup = PowerUp(block.position.x, block.position.y, powerup_type)
                             self.powerups.append(powerup)
@@ -1242,6 +1358,49 @@ class Game:
                 if self.active_powerups[powerup_type] <= 0:
                     self._deactivate_powerup(powerup_type)
         
+        # Update lasers
+        for laser in self.lasers[:]:
+            laser.update(dt)
+            if not laser.active:
+                self.lasers.remove(laser)
+                continue
+            
+            # Check laser-block collisions
+            laser_rect = laser.get_rect()
+            for block in self.level.blocks[:]:
+                if laser_rect.colliderect(block.get_rect()):
+                    points, destroyed = block.hit()
+                    if points > 0:
+                        self.score += points * self.score_multiplier
+                        self.audio.play_block_hit()
+                        
+                        # Chance to spawn power-up
+                        if destroyed and block.block_type.value[1] >= 2 and random.random() < POWERUP_DROP_CHANCE:
+                            powerup_type = random.choice(list(PowerUpType))
+                            powerup = PowerUp(block.position.x, block.position.y, powerup_type)
+                            self.powerups.append(powerup)
+                    
+                    laser.active = False
+                    break
+
+        # Update shield
+        if self.shield and self.shield.active:
+            self.shield.update(paddle_rect.centerx)
+            
+            # Check shield-ball collisions
+            shield_rect = self.shield.get_rect()
+            for ball in self.balls:
+                ball_rect = ball.get_rect()
+                if ball_rect.colliderect(shield_rect):
+                    ball.velocity.y = abs(ball.velocity.y)  # Bounce down
+                    if self.shield.hit():
+                        self.shield = None
+                    break
+
+        # Update laser cooldown
+        if self.laser_cooldown > 0:
+            self.laser_cooldown -= dt
+        
         # Check level completion
         if self.level.is_complete():
             self._complete_level()
@@ -1257,6 +1416,14 @@ class Game:
                 self._spawn_ball()
         elif powerup_type == PowerUpType.PADDLE_EXTEND:
             self.paddle.extend_paddle(duration)
+        elif powerup_type == PowerUpType.SLOW_MOTION:
+            self.slow_motion_active = True
+        elif powerup_type == PowerUpType.LASER_PADDLE:
+            # Laser activation is handled in input processing
+            pass
+        elif powerup_type == PowerUpType.SHIELD:
+            paddle_rect = self.paddle.get_rect()
+            self.shield = Shield(paddle_rect.centerx, paddle_rect.centery, self.paddle.width)
         elif powerup_type == PowerUpType.SCORE_MULTIPLIER:
             self.score_multiplier = 2
     
@@ -1264,6 +1431,8 @@ class Game:
         """Deactivate a power-up effect."""
         if powerup_type == PowerUpType.SCORE_MULTIPLIER:
             self.score_multiplier = 1
+        elif powerup_type == PowerUpType.SLOW_MOTION:
+            self.slow_motion_active = False
     
     def _complete_level(self) -> None:
         """Handle level completion."""
@@ -1312,6 +1481,14 @@ class Game:
         
         for powerup in self.powerups:
             powerup.draw(self.screen)
+        
+        # Draw lasers
+        for laser in self.lasers:
+            laser.draw(self.screen)
+
+        # Draw shield
+        if self.shield and self.shield.active:
+            self.shield.draw(self.screen)
         
         # Draw UI
         self.ui.draw_hud(self.screen, self.score, self.lives, self.current_level, self.active_powerups)
