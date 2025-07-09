@@ -18,11 +18,32 @@ All 6 power-ups are now fully functional with proper activation/deactivation log
 - **Fixed Game Crashes**: Power-up pickup no longer causes crashes due to undefined paddle_rect
 - **Fixed Laser Always Firing**: Laser now only works when power-up is active (proper condition check)
 - **Fixed Missing Implementations**: Slow Motion and Shield now fully functional with complete logic
+- **Fixed Menu Navigation**: High Scores and Controls screens now fully functional
+- **Fixed Non-Responsive Menu Options**: All menu items now work correctly
 
 #### Gameplay Improvements  
 - **Increased Power-Up Drop Rate**: From 15% to 25% for better game flow
 - **Enhanced Visual Feedback**: Shield shows damage state with color changes
 - **Improved Game Balance**: More frequent and meaningful power-ups
+- **Complete Menu System**: All menu options now functional with proper navigation
+
+### 🎨 Visual & Branding Enhancements
+
+#### AWS Q Developer Ball Enhancement
+- **Gradient Visual Effects**: Professional orange-to-white gradient
+- **Enhanced Q Developer Branding**: Large "Q" with "AI" indicator below
+- **AWS Logo Elements**: Branding dots positioned around perimeter
+- **Improved Trail Effects**: Smooth motion trails with AWS orange coloring
+
+#### AWS Load Balancer Paddle Enhancement
+- **Professional AWS Branding**: "AWS Load Balancer" text with proper styling
+- **Enhanced Visual Design**: Gradient effects and professional appearance
+- **Improved Responsiveness**: Better visual feedback during gameplay
+
+#### AWS Service Block Enhancements
+- **Authentic Service Representations**: Each block accurately represents AWS services
+- **Professional Color Scheme**: Official AWS color palette throughout
+- **Enhanced Visual Hierarchy**: Clear tier differentiation with appropriate styling
 
 ### 🔧 Technical Changes
 
@@ -34,12 +55,14 @@ All 6 power-ups are now fully functional with proper activation/deactivation log
 - `Ball` - Added slow motion support with `effective_dt` calculation
 - `Game` - Complete power-up state management and collision detection
 - `PowerUp` - Improved drop rates and activation logic
+- `UI` - Enhanced menu system with all screens functional
 
 #### Code Quality Improvements
 - Fixed collision detection order to prevent crashes
 - Added proper cleanup for inactive game objects  
 - Enhanced error handling for power-up activation
 - Added missing `Ball.get_rect()` method for collision detection
+- Improved state management for menu navigation
 
 ### 🎮 Gameplay Changes
 
@@ -47,6 +70,8 @@ All 6 power-ups are now fully functional with proper activation/deactivation log
 - **SPACE** - Fire lasers (when Laser Paddle power-up is active)
 - **Arrow Keys / A,D** - Move paddle
 - **P / ESC** - Pause game
+- **Enter/Space** - Select menu options
+- **Up/Down Arrows** - Navigate menus
 
 #### Power-Up Mechanics
 - Power-ups drop from Tier 2+ blocks (25% chance)
@@ -66,23 +91,26 @@ All 6 power-ups are now fully functional with proper activation/deactivation log
 - **Power-up pickup crash** - Fixed undefined `paddle_rect` variable by moving definition earlier
 - **Laser always firing** - Fixed condition check from `in self.active_powerups` to `> 0`
 - **Missing Ball.get_rect()** - Added collision detection method for shield interactions
+- **Menu navigation issues** - Fixed High Scores and Controls screen functionality
 
 #### Gameplay Fixes
 - **Slow motion not working** - Implemented proper ball speed modification in Ball.update()
 - **Shield not appearing** - Complete shield implementation with collision and visual feedback
 - **Low power-up frequency** - Increased drop rate from 15% to 25% for better experience
+- **Non-functional menu options** - All menu screens now properly implemented
 
 ### 📋 Files Changed
 - `aws_cloudburst.py` - Main game file with all improvements
-- `RELEASE_NOTES.md` - This file
+- Project structure reorganized with proper folders
 
 ### 🧪 Testing
-All power-ups have been thoroughly tested for:
+All power-ups and menu functions have been thoroughly tested for:
 - Proper activation/deactivation without crashes
 - Collision detection accuracy
 - Visual feedback and effects  
 - Performance impact
 - Cross-power-up compatibility
+- Menu navigation and functionality
 
 ---
 
